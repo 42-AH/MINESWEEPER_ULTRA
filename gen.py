@@ -3,51 +3,13 @@ import tkinter as tk
 from tkinter import messagebox
 import math
 
-def main_menu():
-    def start_game(grid_type):
-        menu.destroy()
-        if grid_type == "hex":
-            size = 5
-            bomb_count = round(size * 3.5)
-            grid = generate_hex_grid(size, bomb_count)
-
-            root = tk.Tk()
-            root.title("MINESWEEPER ULTRA - Hexagonal Field")
-            game = HexMinesweeper(root, grid, size)
-            root.mainloop()
-        elif grid_type == "tri":
-            size = 5
-            bomb_count = round(size * 3.5)
-            grid = generate_tri_grid(size, bomb_count)
-
-            root = tk.Tk()
-            root.title("MINESWEEPER ULTRA - Triangular Field")
-            game = TriMinesweeper(root, grid, size)
-            root.mainloop()
-            
-    # Main menu interface
-    menu = tk.Tk()
-    menu.title("Choose Grid Type")
-
-    label = tk.Label(menu, text="Choose a grid type:", font=("Arial", 16))
-    label.pack(pady=20)
-
-    hex_button = tk.Button(menu, text="Hexagonal Grid", font=("Arial", 14),
-                           command=lambda: start_game("hex"))
-    hex_button.pack(pady=10)
-
-    tri_button = tk.Button(menu, text="Triangular Grid", font=("Arial", 14),
-                           command=lambda: start_game("tri"))
-    tri_button.pack(pady=10)
-
-    menu.mainloop()
-
+# TODO: Triangle grid
 
 def generate_hex_grid(size, bomb_count):
     grid = {}
     for q in range(-size, size + 1):
         for r in range(-size, size + 1):
-            if -q -r >= -size and -q -r <= size:  # Ensure valid hexagonal shape
+            if -q - r >= -size and -q - r <= size:  # Ensure valid hexagonal shape
                 grid[(q, r)] = {'bomb': False, 'count': 0, 'revealed': False, 'flagged': False}
 
     # Place bombs
@@ -90,13 +52,13 @@ class HexMinesweeper:
         x, y = self.axial_to_pixel(q, r)
         points = self.get_hexagon_points(x, y)
 
-        # Determine cell color
+        # Determine cell color (I like burlywood...)
         if cell['revealed']:
             fill_color = 'burlywood1' if (q + r) % 2 == 1 else 'burlywood3'
         elif cell['flagged']:
             fill_color = 'green' if (q + r) % 2 == 0 else 'darkgreen'
         else:
-            # Alternate colors based on the sum of q and r
+            # Alternate colors
             fill_color = 'green' if (q + r) % 2 == 0 else 'darkgreen'
 
         # Draw hexagon
@@ -116,7 +78,7 @@ class HexMinesweeper:
         self.canvas.tag_bind(hex_id, "<Button-1>", lambda event, pos=(q, r): self.reveal_cell(pos))
         self.canvas.tag_bind(hex_id, "<Button-3>", lambda event, pos=(q, r): self.toggle_flag(pos))
 
-    def axial_to_pixel(self, q, r):
+    def axial_to_pixel(self, q, r):   # Axial is the system for having a hexagon grid
         size = self.hex_size
         x = size * 3 / 2 * q
         y = size * math.sqrt(3) * (r + q / 2)
@@ -133,6 +95,19 @@ class HexMinesweeper:
         if pos not in self.grid or self.grid[pos]['revealed'] or self.grid[pos]['flagged']:
             return
         cell = self.grid[pos]
+
+        # If this is the first click and the cell is a bomb, switch the bomb somewhere else
+        if cell['bomb'] and not any(c['revealed'] for c in self.grid.values()):
+            # Find a non-bomb cell
+            for target_pos, target_cell in self.grid.items():
+                if not target_cell['bomb']:
+                    # Swap
+                    target_cell['bomb'] = True
+                    cell['bomb'] = False
+                    # Recalculate bomb counts
+                    self.update_bomb_counts()
+                    break
+
         cell['revealed'] = True
         if cell['bomb']:
             self.redraw_cell(pos)
@@ -141,6 +116,18 @@ class HexMinesweeper:
             self.redraw_cell(pos)
             if cell['count'] == 0:
                 self.reveal_neighbors(pos)
+
+    def update_bomb_counts(self):
+        # If we make the first click not a bomb, but it was, we have to recalculate
+        for (q, r) in self.grid.keys():
+            if not self.grid[(q, r)]['bomb']:
+                neighbors = [
+                    (q + 1, r), (q - 1, r), (q, r + 1),
+                    (q, r - 1), (q + 1, r - 1), (q - 1, r + 1)
+                ]
+                self.grid[(q, r)]['count'] = sum(
+                    self.grid.get(neighbor, {}).get('bomb', False) for neighbor in neighbors
+                )
 
     def toggle_flag(self, pos):
         if pos not in self.grid or self.grid[pos]['revealed']:
@@ -179,15 +166,3 @@ class HexMinesweeper:
         messagebox.showinfo("Game Over", message)
         self.root.destroy()
 
-def main():
-    size = 5
-    bomb_count = round(size * 3.5)
-    grid = generate_hex_grid(size, bomb_count)
-
-    root = tk.Tk()
-    root.title("MINESWEEPER ULTRA")
-    game = HexMinesweeper(root, grid, size)
-    root.mainloop()
-
-if __name__ == "__main__":
-    main_menu()
